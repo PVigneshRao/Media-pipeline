@@ -11,6 +11,86 @@ tamper heuristic) — surfaced through a small status/results API.
 
 ---
 
+## ⚡ Quick Start & How to Use the Application
+
+### 1. Web Dashboard (Pipeline Inspector)
+The application includes a built-in interactive dashboard:
+* **Local URL**: `http://localhost:4000/`
+* **Production/Railway URL**: `https://<your-railway-domain>/`
+
+**How to use the Web UI:**
+1. Open the URL in your browser. The API base input automatically detects the current server URL.
+2. Click the dropzone or drag and drop a vehicle image (`.jpeg`, `.png`, or `.webp`).
+3. Click **Upload & analyze**.
+4. The UI will track your job through the async processing queue (`pending` → `processing` → `completed`).
+5. View real-time visual metrics including **Blur Laplacian variance**, **Brightness level**, **Resolution check**, **Duplicate image detection**, **ANPR OCR plate extraction & format validation**, **Screenshot heuristics**, and **Confidence score**.
+
+---
+
+### 2. Interactive API Documentation
+View complete request/response specifications and JSON schemas directly in your browser:
+* **URL**: `http://localhost:4000/docs` (or `https://<your-domain>/docs`)
+
+---
+
+### 3. REST API Usage (cURL Examples)
+
+#### A. Upload an Image for Asynchronous Processing
+```bash
+curl -X POST http://localhost:4000/api/images/upload \
+  -F "image=@/path/to/car_photo.jpg"
+```
+*Returns `202 Accepted` immediately with a unique `processingId`:*
+```json
+{
+  "processingId": "2e8afad1-3e03-4a57-bd9f-a00184bf40ee",
+  "status": "pending",
+  "message": "Image accepted and queued for processing.",
+  "statusUrl": "/api/images/2e8afad1-3e03-4a57-bd9f-a00184bf40ee/status",
+  "resultUrl": "/api/images/2e8afad1-3e03-4a57-bd9f-a00184bf40ee/result"
+}
+```
+
+#### B. Poll Processing Status
+```bash
+curl http://localhost:4000/api/images/2e8afad1-3e03-4a57-bd9f-a00184bf40ee/status
+```
+*Returns current lifecycle state (`pending`, `processing`, `completed`, or `failed`).*
+
+#### C. Fetch Complete Analysis Results
+```bash
+curl http://localhost:4000/api/images/2e8afad1-3e03-4a57-bd9f-a00184bf40ee/result
+```
+*Returns full quality, integrity, and ANPR results (returns `409 Conflict` if processing is not finished yet).*
+
+#### D. List & Filter Processing History
+```bash
+curl "http://localhost:4000/api/images?status=completed&limit=20&page=1"
+```
+
+#### E. System Health & Queue Monitoring
+```bash
+curl http://localhost:4000/health
+```
+
+---
+
+### 4. Running Locally & Cloud Deployment
+
+#### Local Execution via Docker Compose
+```bash
+docker-compose up -d --build
+```
+Access the application at `http://localhost:4000`.
+
+#### Deployment on Railway
+1. Connect your GitHub repository to **Railway.app**.
+2. Set **Root Directory** to `media-pipeline` in Railway Service Settings.
+3. Provision a **MongoDB** plugin and set environment variable `MONGO_URI` = `${{MongoDB.MONGO_URL}}`.
+4. Railway automatically detects `media-pipeline/Dockerfile` via `railway.json` and builds the service!
+
+---
+
 ## 1. Architecture
 
 ### 1.1 Service flow
