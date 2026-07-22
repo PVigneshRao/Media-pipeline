@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Pipeline Inspector — dev tool</title>
+<style>
+  :root {
+    --bg: #12161c;
+    --panel: #1a2028;
+    --panel-2: #212934;
+    --border: #2b3542;
+    --text: #e6e9ee;
+    --text-dim: #8b96a5;
+    --amber: #ffb020;
+    --amber-dim: #4a3a1a;
+    --green: #34d399;
+    --red: #f87171;
+    --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    padding: 32px 20px 80px;
+  }
+
+  .wrap { max-width: 880px; margin: 0 auto; }
+
+  header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  h1 {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  h1 .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--amber);
+    box-shadow: 0 0 0 3px var(--amber-dim);
+  }
+
+  .devtag {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--amber);
+    background: var(--amber-dim);
+    border: 1px solid #6b5324;
+    padding: 3px 8px;
+    border-radius: 4px;
+    letter-spacing: 0.03em;
+  }
+
+  .subtitle {
+    color: var(--text-dim);
+    font-size: 13px;
+    margin: 0 0 28px;
+  }
+
+  .api-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 24px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  .api-row input {
+    flex: 1;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 7px 10px;
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+  .api-row input:focus { outline: none; border-color: var(--amber); }
+
+  .dropzone {
+    border: 1.5px dashed var(--border);
+    border-radius: 10px;
+    background: var(--panel);
+    padding: 36px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+    position: relative;
+  }
+  .dropzone.drag { border-color: var(--amber); background: #1f1a10; }
+  .dropzone input[type="file"] { display: none; }
+  .dropzone .hint { color: var(--text-dim); font-size: 13px; margin-top: 4px; }
+  .dropzone .verb { font-size: 14px; font-weight: 600; }
+
+  .preview-row {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    margin-top: 16px;
+  }
+  .preview-row img {
+    width: 88px; height: 88px; object-fit: cover;
+    border-radius: 8px; border: 1px solid var(--border);
+  }
+  .preview-meta { font-size: 13px; color: var(--text-dim); }
+  .preview-meta strong { color: var(--text); }
+
+  button.primary {
+    background: var(--amber);
+    color: #1a1200;
+    border: none;
+    font-weight: 700;
+    font-size: 14px;
+    padding: 11px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    margin-top: 16px;
+    transition: filter .15s;
+  }
+  button.primary:hover { filter: brightness(1.08); }
+  button.primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .pipeline {
+    display: flex;
+    align-items: center;
+    margin: 28px 0 8px;
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+  .stage {
+    flex: 1;
+    text-align: center;
+    padding: 10px 4px;
+    color: var(--text-dim);
+    border-bottom: 2px solid var(--border);
+    position: relative;
+  }
+  .stage.active { color: var(--amber); border-color: var(--amber); }
+  .stage.done { color: var(--green); border-color: var(--green); }
+  .stage.failed { color: var(--red); border-color: var(--red); }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin-top: 14px;
+  }
+
+  .card h3 {
+    margin: 0 0 12px;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  .issues { display: flex; flex-wrap: wrap; gap: 8px; }
+  .badge {
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 5px 10px;
+    border-radius: 6px;
+    border: 1px solid;
+  }
+  .badge.flag { background: #3a1f1f; border-color: #6b3030; color: #ffb4b4; }
+  .badge.clean { background: #16302a; border-color: #2a5c4c; color: #8be8c7; }
+
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 12px;
+  }
+  .metric {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+  .metric .label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; }
+  .metric .value { font-family: var(--mono); font-size: 15px; margin-top: 3px; }
+  .metric .value.pass { color: var(--green); }
+  .metric .value.fail { color: var(--red); }
+
+  details {
+    margin-top: 16px;
+  }
+  summary {
+    cursor: pointer;
+    color: var(--text-dim);
+    font-size: 12px;
+    font-family: var(--mono);
+  }
+  pre {
+    background: #0d1116;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    font-family: var(--mono);
+    font-size: 12px;
+    overflow-x: auto;
+    color: #c8d0dc;
+    margin-top: 10px;
+  }
+
+  .error-box {
+    background: #2a1616;
+    border: 1px solid #5c2b2b;
+    color: #ffb4b4;
+    padding: 12px 14px;
+    border-radius: 8px;
+    font-family: var(--mono);
+    font-size: 12px;
+    margin-top: 14px;
+  }
+
+  .status-line {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 8px;
+  }
+  .status-line .id { color: var(--text); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1><span class="dot"></span> Pipeline Inspector</h1>
+   
+  </header>
+  <p class="subtitle">Upload an image, watch it move through the async queue, and see every check's raw output. Not part of the backend deliverable.</p>
+
+  <div class="api-row">
+    <span>API base</span>
+    <input id="apiBase" value="http://localhost:4000" spellcheck="false" />
+  </div>
+
+  <div class="dropzone" id="dropzone">
+    <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp" />
+    <div class="verb">Click to choose an image, or drag one here</div>
+    <div class="hint">jpeg / png / webp</div>
+  </div>
+
+  <div class="preview-row" id="previewRow" style="display:none;">
+    <img id="previewImg" alt="preview" />
+    <div class="preview-meta">
+      <div><strong id="previewName"></strong></div>
+      <div id="previewSize"></div>
+    </div>
+  </div>
+
+  <button class="primary" id="uploadBtn" disabled>Upload &amp; analyze</button>
+
+  <div id="pipelineWrap" style="display:none;">
+    <div class="pipeline">
+      <div class="stage" id="stagePending">pending</div>
+      <div class="stage" id="stageProcessing">processing</div>
+      <div class="stage" id="stageDone">completed</div>
+    </div>
+    <div class="status-line" id="statusLine"></div>
+  </div>
+
+  <div id="results"></div>
+</div>
+
+<script>
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('fileInput');
+  const uploadBtn = document.getElementById('uploadBtn');
+  const previewRow = document.getElementById('previewRow');
+  const previewImg = document.getElementById('previewImg');
+  const previewName = document.getElementById('previewName');
+  const previewSize = document.getElementById('previewSize');
+  const pipelineWrap = document.getElementById('pipelineWrap');
+  const statusLine = document.getElementById('statusLine');
+  const resultsEl = document.getElementById('results');
+  const apiBaseInput = document.getElementById('apiBase');
+
+  let selectedFile = null;
+  let pollTimer = null;
+
+  dropzone.addEventListener('click', () => fileInput.click());
+  dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('drag'); });
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag'));
+  dropzone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropzone.classList.remove('drag');
+    if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files.length) handleFile(fileInput.files[0]);
+  });
+
+  function handleFile(file) {
+    selectedFile = file;
+    previewImg.src = URL.createObjectURL(file);
+    previewName.textContent = file.name;
+    previewSize.textContent = (file.size / 1024).toFixed(1) + ' KB';
+    previewRow.style.display = 'flex';
+    uploadBtn.disabled = false;
+    resultsEl.innerHTML = '';
+    pipelineWrap.style.display = 'none';
+  }
+
+  uploadBtn.addEventListener('click', async () => {
+    if (!selectedFile) return;
+    if (pollTimer) clearInterval(pollTimer);
+
+    uploadBtn.disabled = true;
+    uploadBtn.textContent = 'Uploading…';
+    resultsEl.innerHTML = '';
+    setStage('pending');
+    pipelineWrap.style.display = 'block';
+
+    const base = apiBaseInput.value.replace(/\/$/, '');
+    const form = new FormData();
+    form.append('image', selectedFile);
+
+    try {
+      const res = await fetch(`${base}/api/images/upload`, { method: 'POST', body: form });
+      const data = await res.json();
+
+      if (!res.ok) {
+        showError(data.error || 'Upload failed.');
+        resetUploadBtn();
+        return;
+      }
+
+      statusLine.innerHTML = `id: <span class="id">${data.processingId}</span>`;
+      pollStatus(base, data.processingId);
+    } catch (err) {
+      showError(`Could not reach ${base} — is the server running? (${err.message})`);
+      resetUploadBtn();
+    }
+  });
+
+  function resetUploadBtn() {
+    uploadBtn.disabled = false;
+    uploadBtn.textContent = 'Upload & analyze';
+  }
+
+  function setStage(stage) {
+    ['stagePending', 'stageProcessing', 'stageDone'].forEach(id => {
+      document.getElementById(id).className = 'stage';
+    });
+    if (stage === 'pending') document.getElementById('stagePending').classList.add('active');
+    if (stage === 'processing') {
+      document.getElementById('stagePending').classList.add('done');
+      document.getElementById('stageProcessing').classList.add('active');
+    }
+    if (stage === 'completed') {
+      document.getElementById('stagePending').classList.add('done');
+      document.getElementById('stageProcessing').classList.add('done');
+      document.getElementById('stageDone').classList.add('done');
+    }
+    if (stage === 'failed') {
+      document.getElementById('stageProcessing').classList.add('failed');
+    }
+  }
+
+  function pollStatus(base, processingId) {
+    pollTimer = setInterval(async () => {
+      try {
+        const res = await fetch(`${base}/api/images/${processingId}/status`);
+        const data = await res.json();
+
+        setStage(data.status);
+        statusLine.innerHTML = `id: <span class="id">${processingId}</span> · attempt ${data.attempts}/${data.maxAttempts}`;
+
+        if (data.status === 'completed') {
+          clearInterval(pollTimer);
+          resetUploadBtn();
+          const resultRes = await fetch(`${base}/api/images/${processingId}/result`);
+          const result = await resultRes.json();
+          renderResult(result);
+        } else if (data.status === 'failed') {
+          clearInterval(pollTimer);
+          resetUploadBtn();
+          showError(data.failureReason || 'Processing failed after all retry attempts.');
+        }
+      } catch (err) {
+        clearInterval(pollTimer);
+        resetUploadBtn();
+        showError(`Lost connection while polling: ${err.message}`);
+      }
+    }, 1000);
+  }
+
+  function showError(msg) {
+    resultsEl.innerHTML = `<div class="error-box">${escapeHtml(msg)}</div>`;
+  }
+
+  function badge(text, isFlag) {
+    return `<span class="badge ${isFlag ? 'flag' : 'clean'}">${escapeHtml(text)}</span>`;
+  }
+
+  function metric(label, value, status) {
+    const cls = status === 'pass' ? 'pass' : status === 'fail' ? 'fail' : '';
+    return `<div class="metric"><div class="label">${escapeHtml(label)}</div><div class="value ${cls}">${escapeHtml(String(value))}</div></div>`;
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  }
+
+  function renderResult(result) {
+    const a = result.analysis;
+    const issues = a.issues || [];
+
+    let html = '';
+
+    html += `<div class="card"><h3>Issues detected</h3><div class="issues">`;
+    html += issues.length
+      ? issues.map(i => badge(i, true)).join('')
+      : badge('no issues flagged', false);
+    html += `</div></div>`;
+
+    html += `<div class="card"><h3>Key metrics</h3><div class="metrics">`;
+    html += metric('Blur (Laplacian var)', a.blur.laplacianVariance, a.blur.isBlurry ? 'fail' : 'pass');
+    html += metric('Brightness (mean)', a.brightness.meanBrightness, a.brightness.isLowLight ? 'fail' : 'pass');
+    html += metric('Resolution', `${a.dimensions.width}×${a.dimensions.height}`, a.dimensions.isValidResolution ? 'pass' : 'fail');
+    html += metric('Duplicate?', a.duplicate.isDuplicate ? `yes (${a.duplicate.matchedProcessingId?.slice(0,8)}…)` : 'no', a.duplicate.isDuplicate ? 'fail' : 'pass');
+    html += metric('Detected plate', a.ocr.detectedPlate || '—', a.ocr.detectedPlate ? 'pass' : '');
+    html += metric('Plate format valid', a.ocr.isValidPlateFormat === null ? 'n/a' : a.ocr.isValidPlateFormat, a.ocr.isValidPlateFormat === false ? 'fail' : (a.ocr.isValidPlateFormat ? 'pass' : ''));
+    html += metric('Screenshot-like?', a.screenshotCheck.isLikelyScreenshot, a.screenshotCheck.isLikelyScreenshot ? 'fail' : 'pass');
+    html += metric('Photo-of-photo?', a.screenshotCheck.isLikelyPhotoOfPhoto, a.screenshotCheck.isLikelyPhotoOfPhoto ? 'fail' : 'pass');
+    html += metric('Suspicious edit?', a.editingHeuristics.isSuspiciousEdit, a.editingHeuristics.isSuspiciousEdit ? 'fail' : 'pass');
+    html += metric('Confidence score', a.confidenceScore, '');
+    html += `</div></div>`;
+
+    if (a.ocr.extractedText) {
+      html += `<div class="card"><h3>OCR extracted text</h3><pre>${escapeHtml(a.ocr.extractedText)}</pre></div>`;
+    }
+
+    if (a.screenshotCheck.reasons?.length) {
+      html += `<div class="card"><h3>Screenshot/photo-of-photo reasons</h3><div class="issues">${a.screenshotCheck.reasons.map(r => badge(r, false)).join('')}</div></div>`;
+    }
+
+    html += `<details><summary>Raw JSON response</summary><pre>${escapeHtml(JSON.stringify(result, null, 2))}</pre></details>`;
+
+    resultsEl.innerHTML = html;
+  }
+</script>
+</body>
+</html>

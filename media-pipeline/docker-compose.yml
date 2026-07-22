@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  mongo:
+    image: mongo:7
+    container_name: media_pipeline_mongo
+    restart: unless-stopped
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongo_data:/data/db
+
+  app:
+    build: .
+    container_name: media_pipeline_app
+    restart: unless-stopped
+    depends_on:
+      - mongo
+    ports:
+      - '4000:4000'
+    environment:
+      PORT: 4000
+      MONGO_URI: mongodb://mongo:27017/media_pipeline
+      STORAGE_DIR: storage/uploads
+      PYTHON_BIN: python3
+      MAX_UPLOAD_MB: 15
+      QUEUE_CONCURRENCY: 2
+      MAX_JOB_ATTEMPTS: 3
+      JOB_RETRY_DELAY_MS: 2000
+      BLUR_LAPLACIAN_THRESHOLD: 100
+      LOW_LIGHT_MEAN_THRESHOLD: 60
+      DUPLICATE_HASH_DISTANCE_THRESHOLD: 5
+      MIN_WIDTH: 400
+      MIN_HEIGHT: 300
+    volumes:
+      - ./storage/uploads:/app/storage/uploads
+
+volumes:
+  mongo_data:
