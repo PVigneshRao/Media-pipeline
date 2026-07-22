@@ -295,6 +295,9 @@
   const statusLine = document.getElementById('statusLine');
   const resultsEl = document.getElementById('results');
   const apiBaseInput = document.getElementById('apiBase');
+  if (window.location.origin && window.location.origin !== 'null' && window.location.protocol !== 'file:') {
+    apiBaseInput.value = window.location.origin;
+  }
 
   let selectedFile = null;
   let pollTimer = null;
