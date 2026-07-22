@@ -13,7 +13,8 @@ COPY package*.json ./
 RUN npm install --omit=dev
 
 COPY src/analysis/requirements.txt ./src/analysis/requirements.txt
-RUN pip3 install --no-cache-dir -r src/analysis/requirements.txt
+RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel && \
+    pip3 install --no-cache-dir -r src/analysis/requirements.txt
 
 COPY . .
 
