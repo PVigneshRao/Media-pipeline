@@ -17,29 +17,10 @@ const PORT = process.env.PORT || 4000;
 const QUEUE_CONCURRENCY = parseInt(process.env.QUEUE_CONCURRENCY || '2', 10);
 
 async function start() {
-  await connectDB();
+  const app = express();
 
-  // The queue and its handler are created here (not inside a route file) so
-  // there is exactly one queue instance for the process lifetime, and both
-  // the upload route (producer) and the worker (consumer) share it.
   const queue = new InMemoryQueue({ concurrency: QUEUE_CONCURRENCY });
   queue.process(createImageJobHandler(queue));
-
-  // Recovery pass: if the process crashed mid-job, those images are stuck in
-  // "pending"/"processing" in the DB with no corresponding in-memory job.
-  // Re-enqueue them on startup so they aren't silently lost forever. This
-  // doesn't make the queue durable, but it closes the most common failure
-  // window (a restart) without needing an external broker.
-  const Image = require('./models/Image');
-  const stuck = await Image.find({ status: { $in: ['pending', 'processing'] } })
-    .select('processingId')
-    .lean();
-  if (stuck.length) {
-    logger.info(`Re-enqueuing ${stuck.length} job(s) left over from a previous run`);
-    stuck.forEach((doc) => queue.enqueue({ id: doc.processingId, processingId: doc.processingId }));
-  }
-
-  const app = express();
 
   app.use(cors());
   app.use(express.json());
@@ -47,7 +28,13 @@ async function start() {
   app.use(express.static(path.join(__dirname, '../ui')));
 
   app.get('/health', (req, res) => {
-    res.json({ status: 'ok', queueSize: queue.size(), uptime: process.uptime() });
+    const isDbConnected = require('mongoose').connection.readyState === 1;
+    res.json({
+      status: 'ok',
+      dbConnected: isDbConnected,
+      queueSize: queue.size(),
+      uptime: process.uptime(),
+    });
   });
 
   app.use('/api/images/upload', buildUploadRouter(queue));
@@ -56,9 +43,24 @@ async function start() {
   app.use(notFoundHandler);
   app.use(errorHandler);
 
-  app.listen(PORT, () => {
-    logger.info(`Server listening on port ${PORT}`);
+  app.listen(PORT, '0.0.0.0', () => {
+    logger.info(`Server listening on port ${PORT} (host 0.0.0.0)`);
   });
+
+  // Connect to DB and perform recovery pass
+  try {
+    await connectDB();
+    const Image = require('./models/Image');
+    const stuck = await Image.find({ status: { $in: ['pending', 'processing'] } })
+      .select('processingId')
+      .lean();
+    if (stuck.length) {
+      logger.info(`Re-enqueuing ${stuck.length} job(s) left over from a previous run`);
+      stuck.forEach((doc) => queue.enqueue({ id: doc.processingId, processingId: doc.processingId }));
+    }
+  } catch (err) {
+    logger.error(`Database initialization error: ${err.message}`);
+  }
 }
 
 start().catch((err) => {
