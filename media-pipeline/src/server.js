@@ -1,5 +1,6 @@
 require('dotenv').config();
 
+const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
@@ -43,6 +44,7 @@ async function start() {
   app.use(cors());
   app.use(express.json());
   app.use(morgan('dev', { stream: { write: (msg) => logger.http ? logger.http(msg.trim()) : logger.info(msg.trim()) } }));
+  app.use(express.static(path.join(__dirname, '../ui')));
 
   app.get('/health', (req, res) => {
     res.json({ status: 'ok', queueSize: queue.size(), uptime: process.uptime() });
