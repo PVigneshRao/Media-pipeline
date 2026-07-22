@@ -2,7 +2,12 @@ const mongoose = require('mongoose');
 const logger = require('../utils/logger');
 
 async function connectDB() {
-  const uri = process.env.MONGO_URI || 'mongodb://localhost:27017/media_pipeline';
+  const uri =
+    process.env.MONGO_URI ||
+    process.env.MONGO_URL ||
+    process.env.MONGODB_URL ||
+    process.env.MONGO_PRIVATE_URL ||
+    'mongodb://localhost:27017/media_pipeline';
   try {
     await mongoose.connect(uri);
     logger.info(`MongoDB connected -> ${uri}`);
