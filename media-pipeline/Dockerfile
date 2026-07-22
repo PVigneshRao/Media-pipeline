@@ -1,5 +1,7 @@
 FROM node:18-bookworm-slim
 
+ENV PIP_BREAK_SYSTEM_PACKAGES=1
+
 # Python + system deps for OpenCV and Tesseract OCR.
 RUN apt-get update && apt-get install -y --no-install-recommends --fix-missing \
     python3 python3-pip \
@@ -13,8 +15,7 @@ COPY package*.json ./
 RUN npm install --omit=dev
 
 COPY src/analysis/requirements.txt ./src/analysis/requirements.txt
-RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip3 install --no-cache-dir -r src/analysis/requirements.txt
+RUN pip3 install --no-cache-dir --break-system-packages -r src/analysis/requirements.txt
 
 COPY . .
 
