@@ -3,5 +3,11 @@
   "build": {
     "builder": "DOCKERFILE",
     "dockerfilePath": "media-pipeline/Dockerfile"
+  },
+  "deploy": {
+    "healthcheckPath": "/health",
+    "healthcheckTimeout": 300,
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 10
   }
 }
