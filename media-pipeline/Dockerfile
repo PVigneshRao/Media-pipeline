@@ -1,7 +1,7 @@
-FROM node:18-bullseye-slim
+FROM node:18-bookworm-slim
 
 # Python + system deps for OpenCV and Tesseract OCR.
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get install -y --no-install-recommends --fix-missing \
     python3 python3-pip \
     tesseract-ocr \
     libgl1 libglib2.0-0 \
