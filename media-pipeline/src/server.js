@@ -27,6 +27,10 @@ async function start() {
   app.use(morgan('dev', { stream: { write: (msg) => logger.http ? logger.http(msg.trim()) : logger.info(msg.trim()) } }));
   app.use(express.static(path.join(__dirname, '../ui')));
 
+  app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, '../ui/index.html'));
+  });
+
   app.get('/health', (req, res) => {
     const isDbConnected = require('mongoose').connection.readyState === 1;
     res.json({
